@@ -5,7 +5,7 @@ public class PasswordRecord {
 	// Attributes
 	private int id;
 	private int userId;
-	private String service;
+	private String resource;
 	private String password;
 	
 	
@@ -16,11 +16,11 @@ public class PasswordRecord {
 	public void setPassword(String password) {
 		this.password = password;
 	}
-	public String getService() {
-		return service;
+	public String getResource() {
+		return resource;
 	}
-	public void setService(String service) {
-		this.service = service;
+	public void setResource(String resource) {
+		this.resource = resource;
 	}
 	public int getId() {
 		return id;
@@ -38,8 +38,8 @@ public class PasswordRecord {
 	
 	
 	// Constructor
-	public PasswordRecord(int id, int userId, String service, String password) {
-		this.setService(service);
+	public PasswordRecord(int id, int userId, String resource, String password) {
+		this.setResource(resource);
 		this.setPassword(password);
 		this.setUserId(userId);
 		this.setId(id);
@@ -57,7 +57,7 @@ public class PasswordRecord {
 	 * @return       Encrypted service password
 	 * 
 	 */
-	public String encrypt(String userPassword, String servicePassword) {
+	public String encrypt(String userPassword, String resourcePassword) {
 		return "Encrypted service password";
 	}
 	

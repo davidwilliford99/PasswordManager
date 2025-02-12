@@ -1,6 +1,8 @@
 package models;
 
 import services.CryptoService;
+import services.DatabaseService;
+
 
 public class User {
 	
@@ -26,13 +28,27 @@ public class User {
 	private void setEncryptionKey(String password) {
 		this.encryptionKey = CryptoService.hash(password);
 	}
+	public String getEncryptionKey() {
+		return encryptionKey;
+	}
 	
 
 	// constructor
-	public User(int id, String password) {
-		this.setId(id);
+	public User(String password) {
+		this.setId(50000);               // default value
 		this.setPassword(password);
 		this.setEncryptionKey(password);
+	}
+	
+	
+	// add User object to database
+	// also updates id to match database value
+	public void save() {
+		User newUser = DatabaseService.addNewUser(
+			this.getPassword(),
+			this.getEncryptionKey()
+		);
+		this.setId(newUser.getId());
 	}
 
 }

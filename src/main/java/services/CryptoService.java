@@ -58,7 +58,6 @@ public class CryptoService {
 	      Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 	      cipher.init(Cipher.DECRYPT_MODE, secretKey);
 	      
-	      // Return original string
 	      byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedString));
 	      return new String(decryptedBytes);
 	  }
