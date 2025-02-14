@@ -1,5 +1,5 @@
 # Password Manager
-![Build](https://github.com/davidwilliford99/PasswordManager/actions/workflows/YOUR_WORKFLOW_FILE.yml/badge.svg)
+![Build](https://github.com/davidwilliford99/PasswordManager/actions/workflows/maven-publish.yml/badge.svg)
 ---
 A secure, encrypted and completely offline desktop app solution for managing passwords.
 
