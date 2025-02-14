@@ -1,5 +1,8 @@
 package models;
 
+import services.CryptoService;
+
+
 public class PasswordRecord {
 	
 	// Attributes
@@ -55,24 +58,10 @@ public class PasswordRecord {
 	 * @description  Encrypt service password using your user password as the key
 	 * 
 	 * @return       Encrypted service password
+	 * @throws       Exception 
 	 * 
 	 */
-	public String encrypt(String userPassword, String resourcePassword) {
-		return "Encrypted service password";
-	}
-	
-	
-	/**
-	 * 
-	 * @param        userPassword
-	 * @param        encryptedString
-	 * 
-	 * @description  Decrypt service password using your user password as the key
-	 * 
-	 * @return       Decrypted service password
-	 * 
-	 */
-	public String decrypt(String userPassword, String encryptedString) {
-		return "Decrypted service password";
+	public void encrypt(String userKey) throws Exception {
+		CryptoService.encrypt(this.getPassword(), userKey);
 	}
 }

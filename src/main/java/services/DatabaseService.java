@@ -104,15 +104,16 @@ public class DatabaseService {
 	 * @param        userId
 	 * @param        resource
 	 * @param        password
+	 * @throws Exception 
 	 * 
 	 * @description  Add new Password Record to Database
 	 */
-	public static PasswordRecord addNewPasswordRecord(int userId, String resource, String password, String userKey) {
+	public static PasswordRecord addNewPasswordRecord(int userId, String resource, String password, String userKey) throws Exception {
 		
 		String addNewPasswordRecord = String.format(
 		      "INSERT INTO password_records(user_id, resource, password) "
 		    + "VALUES(%d, '%s', '%s');", // 🔹 Ensure user_id matches table definition
-		      userId, resource, password
+		      userId, resource, CryptoService.encrypt(password, userKey)
 		);
 		
 		try {
@@ -134,11 +135,14 @@ public class DatabaseService {
 	 * 
 	 * @param        resource
 	 * @return       List of fields from table 
+	 * @throws Exception 
+	 * @throws NumberFormatException 
 	 */
-	public static PasswordRecord getPasswordRecord(String resource, String userKey) {
+	public static PasswordRecord getPasswordRecord(String resource, String userKey) 
+	throws NumberFormatException, Exception {
 		
 		String getPasswordRecordQuery = String.format(
-				"SELECT * from password_records WHERE resource=%s",
+				"SELECT * from password_records WHERE resource='%s'",
 				resource
 		);
 		
@@ -200,7 +204,7 @@ public class DatabaseService {
 			while (queryResult.next()) {
 		        PasswordRecord record = new PasswordRecord(
 		            queryResult.getInt("id"),
-		            queryResult.getInt("userId"),
+		            queryResult.getInt("user_id"),
 		            queryResult.getString("resource"),
 		            queryResult.getString("password")
 		        );
@@ -221,13 +225,47 @@ public class DatabaseService {
 	
 	
 	/**
+	 * @description  Getting password records by their resource string
+	 * 
+	 * @param        resource
+	 * @return       List of fields from table 
+	 * @throws Exception 
+	 * @throws NumberFormatException 
+	 */
+	public static boolean deletePasswordRecord(String resource, String userKey) {
+		
+		String getPasswordRecordQuery = String.format(
+				"DELETE FROM password_records WHERE resource = '%s'",
+				resource
+		);
+
+		try {
+			Connection connect = connect(userKey);
+			Statement stmt = connect.createStatement();
+			ResultSet queryResult = stmt.executeQuery(getPasswordRecordQuery);
+			
+            connect.close();
+		} 
+		catch (SQLException e) { e.printStackTrace(); return false; }
+		
+		return true;
+	}
+	
+	
+	
+	/**
 	 * @param        password
 	 * 
 	 * @description  Add new Password Record to DB
 	 */
 	public static User addNewUser(String password, String userKey) {
 		
-		String hashedPassword = CryptoService.hash(password);
+		String hashedPassword = "";
+		try {
+			hashedPassword = CryptoService.hash(password);
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
 		
 		String addNewUser = String.format(
 		    "INSERT INTO users(password) VALUES('%s');",
@@ -261,7 +299,12 @@ public class DatabaseService {
 	 */
 	public static User getUser(String password, String userKey) {
 		
-		String hashedPassword = CryptoService.hash(password);
+		String hashedPassword = "";
+		try {
+			hashedPassword = CryptoService.hash(password);
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
 		
 		String getUserQuery = String.format(
 	        "SELECT * FROM users WHERE password = '%s'",
@@ -275,6 +318,7 @@ public class DatabaseService {
 			Connection connect = connect(userKey);
 			Statement stmt = connect.createStatement();
 			ResultSet queryResult = stmt.executeQuery(getUserQuery);
+			
 			if(queryResult.next()) {
 				user.setId(queryResult.getInt("id"));
 				user.setPassword(queryResult.getString("password"));

@@ -1,16 +1,21 @@
 package frontend;
 
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 
 import javafx.application.Application;
 import javafx.collections.FXCollections;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
+import javafx.scene.layout.HBox;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.Stage;
 import services.CryptoService;
 import services.DatabaseService;
 import services.MainService;
@@ -51,9 +56,11 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
     	
         VBox layout = new VBox(10);
-        Scene scene = new Scene(layout, 300, 200);
+        Scene scene = new Scene(layout, 600, 400);
         
-        primaryStage.setTitle("JavaFX App");
+        layout.setPadding(new Insets(5)); // padding
+        
+        primaryStage.setTitle("Password Manager");
         
         /**
          * Main user object used in application
@@ -80,11 +87,18 @@ public class Main extends Application {
     private void setupFirstStartUI(VBox layout, User user) {
         TextField textField = new TextField();
         textField.setPromptText("Create a New Password");
+
         Button submitButton = new Button("Submit");
 
         submitButton.setOnAction(e -> handleFirstStart(textField.getText(), layout, user));
 
-        layout.getChildren().addAll(new Label("Set Up Your Password"), textField, submitButton);
+        Label label = new Label("Set Up Your Password");
+
+        // Set layout properties
+        layout.getChildren().addAll(label, textField, submitButton);
+        layout.setAlignment(Pos.CENTER); // Center elements
+        layout.setSpacing(10); // Space between elements
+        layout.setFillWidth(false); // Prevent full width filling
     }
 
     
@@ -95,7 +109,11 @@ public class Main extends Application {
      * @param        password
      */
     private void handleFirstStart(String password, VBox layout, User user) {
-        MainService.bootstrap(CryptoService.hash(password));
+    	
+    	// bootstrap application
+        try {MainService.bootstrap(CryptoService.hash(password));} 
+        catch (UnsupportedEncodingException e) {e.printStackTrace();}
+        
         user = new User(password);
         user.save();
         mainDashboardUI(layout, user);
@@ -133,7 +151,10 @@ public class Main extends Application {
         
         if (authStatus) {
             outputLabel.setText("Authentication successful!");
-            user = DatabaseService.getUser(password, CryptoService.hash(password));
+            
+            try {user = DatabaseService.getUser(password, CryptoService.hash(password));} 
+            catch (UnsupportedEncodingException e) {e.printStackTrace();}
+            
             mainDashboardUI(layout, user);
         } 
         else { outputLabel.setText("Incorrect Password"); }
@@ -147,30 +168,122 @@ public class Main extends Application {
      * @param        layout
      */
     @SuppressWarnings("unchecked")
-	private void mainDashboardUI(VBox layout, User user) {
-    	
-    	// Get all Password records 
-    	List<PasswordRecord> records = 
-			DatabaseService.getAllPasswordRecords(
-				user.getId(), 
-				user.getEncryptionKey()
-			);
-    	
-    	// Display as a table (resource_name, ********)
-    	TableView<PasswordRecord> tableView = new TableView<>();
+    private void mainDashboardUI(VBox layout, User user) {
+        
+        layout.getChildren().clear();
+        
+        List<PasswordRecord> records = 
+            DatabaseService.getAllPasswordRecords(
+                user.getId(), 
+                user.getEncryptionKey()
+            );
+        
+        TableView<PasswordRecord> tableView = new TableView<>();
+        
         TableColumn<PasswordRecord, String> resourceColumn = new TableColumn<>("Resource");
         resourceColumn.setCellValueFactory(new PropertyValueFactory<>("resource"));
-        TableColumn<PasswordRecord, String> passwordColumn = new TableColumn<>("Password");
-        passwordColumn.setCellValueFactory(new PropertyValueFactory<>("password"));
-        tableView.getColumns().addAll(resourceColumn, passwordColumn);
-        tableView.setItems(FXCollections.observableArrayList(records));
-    	
-    	// TODO: Configure logic to show CryptoService.decrypt(record.getPassword(), user.getEncryptionKey()) when user clicks 'show'
-    	
+
+        TableColumn<PasswordRecord, Void> showPasswordColumn = new TableColumn<>("Show Password");
+        showPasswordColumn.setPrefWidth(400);
+  
+        // Add a button to show the password in each row
+        showPasswordColumn.setCellFactory(param -> 
+	        new TableCell<PasswordRecord, Void>() {
+	            private final Button showButton = new Button("Show Password");	            
+	            private final TextField passwordLabel = new TextField("**********");
+	            private boolean isPasswordVisible = false;
+	            
+	            {
+		            passwordLabel.setEditable(false);
+		            passwordLabel.setFocusTraversable(false);
+		            showButton.setPrefWidth(120);
+	            	
+	                // Button click event to toggle password visibility
+	                showButton.setOnAction(event -> {
+	                    PasswordRecord record = getTableView().getItems().get(getIndex());
+	                    
+	                    if (isPasswordVisible) {
+	                        passwordLabel.setText("**********");
+	                        showButton.setText("Show Password");
+	                    } else {
+	                        try {
+	                            String decryptedPassword = CryptoService.decrypt(record.getPassword(), user.getEncryptionKey());
+	                            passwordLabel.setText(decryptedPassword); 
+	                        } catch (Exception e) {
+	                            e.printStackTrace();
+	                        }
+	                        showButton.setText("Hide Password");
+	                    }
+	                    
+	                    isPasswordVisible = !isPasswordVisible; // Toggle state
+	                });
+	            }
+	
+	            @Override
+	            protected void updateItem(Void item, boolean empty) {
+	                super.updateItem(item, empty);
+	                if (empty) {
+	                    setGraphic(null);
+	                } else {
+	                    HBox container = new HBox(10, showButton, passwordLabel); // Layout to hold button & label
+	                    setGraphic(container);
+	                }
+	            }
+	        }
+	    );
         
-        // have button to open 'Add New Password Form'
+        
+        // Delete password column 
+        TableColumn<PasswordRecord, Void> deletePasswordColumn = new TableColumn<>("");
+
+        deletePasswordColumn.setCellFactory(param -> 
+            new TableCell<PasswordRecord, Void>() {
+                private final Button deleteButton = new Button("Delete");            
+
+                {
+                    deleteButton.setPrefWidth(80);
+
+                    deleteButton.setOnAction(event -> {
+                        PasswordRecord record = getTableView().getItems().get(getIndex());
+
+                        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                        alert.setTitle("Delete Confirmation");
+                        alert.setHeaderText("Are you sure you want to delete this password?");
+                        alert.setContentText("This action cannot be undone.");
+
+                        Optional<ButtonType> result = alert.showAndWait();
+                        if (result.isPresent() && result.get() == ButtonType.OK) {
+                            DatabaseService.deletePasswordRecord(record.getResource(), user.getEncryptionKey());
+
+                            // Remove from TableView
+                            getTableView().getItems().remove(record);
+                        }
+                    });
+                }
+
+                @Override
+                protected void updateItem(Void item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty) {
+                        setGraphic(null);
+                    } else {
+                        HBox container = new HBox(10, deleteButton); // Use HBox for proper alignment
+                        setGraphic(container);
+                    }
+                }
+            }
+        );
+
+
+
+        tableView.getColumns().addAll(resourceColumn, showPasswordColumn, deletePasswordColumn);
+        tableView.setItems(FXCollections.observableArrayList(records));
+
         Button addPasswordButton = new Button("Add Password");
         addPasswordButton.setOnAction(e -> AddPaswordForm(layout, user));
+
+        // Render table and button to UI
+        layout.getChildren().addAll(tableView, addPasswordButton);
     }
     
     
@@ -182,9 +295,31 @@ public class Main extends Application {
      * @param        user
      */
     private void AddPaswordForm(VBox layout, User user) {
-    	// TODO: display form (ask for resource name and password)
-    	// TODO: create new password record and add to database
+
+    	TextField resourceField = new TextField();
+    	resourceField.setPromptText("Resource (Gmail, Reddit, etc)");
+    	
+    	TextField passwordField = new TextField();
+    	passwordField.setPromptText("Password");
+    	
+    	Button addPasswordButton = new Button("Add new password record");
+    	
+    	addPasswordButton.setOnAction(e -> {
+    		try {
+				DatabaseService.addNewPasswordRecord(
+					user.getId(), 
+					resourceField.getText(), 
+					passwordField.getText(), 
+					user.getEncryptionKey()
+				);
+				
+				// refresh view
+				mainDashboardUI(layout, user);
+			} 
+    		catch (Exception e1) {e1.printStackTrace();}
+    	});
         
+    	layout.getChildren().addAll(resourceField, passwordField, addPasswordButton);
     }
 
     

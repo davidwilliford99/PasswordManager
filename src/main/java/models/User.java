@@ -1,5 +1,7 @@
 package models;
 
+import java.io.UnsupportedEncodingException;
+
 import services.CryptoService;
 import services.DatabaseService;
 
@@ -26,7 +28,8 @@ public class User {
 		this.id = id;
 	}
 	private void setEncryptionKey(String password) {
-		this.encryptionKey = CryptoService.hash(password);
+		try {this.encryptionKey = CryptoService.hash(password);} 
+		catch (UnsupportedEncodingException e) {e.printStackTrace();}
 	}
 	public String getEncryptionKey() {
 		return encryptionKey;
@@ -38,6 +41,11 @@ public class User {
 		this.setId(50000);               // default value
 		this.setPassword(password);
 		this.setEncryptionKey(password);
+	}
+	
+	
+	public String toString() {
+		return "{" + "\n\t" + this.id + "\n\t" + this.password + '\n' + '}';
 	}
 	
 	
