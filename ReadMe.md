@@ -30,10 +30,9 @@ Most password managers cost money, are closed-source and require internet connec
 <img width="450" alt="pwm-ss" src="https://github.com/user-attachments/assets/1b98c56d-d75a-4f2b-9fb2-ec9c0a425d0b" />
 
 ## Stack 
-* Java JDBC
-* JavaFX
-* SQLite
-* SQLCipher
+![Java](https://img.shields.io/badge/java-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white)
+![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white)
+![JavaFX](https://img.shields.io/badge/javafx-%23FF0000.svg?style=for-the-badge&logo=javafx&logoColor=white)
 
 ## Backlog before first public release
 * Extend capabilities of UI
