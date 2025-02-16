@@ -28,7 +28,9 @@ A secure, open-source, lightweight and completely offline desktop app solution f
 Most password managers cost money, are closed-source and require internet connection (super sketchy). It is very important to trust your password managers, and what better way to build trust than reading the source code for yourself.
 
 ## How It Works
-Upon first launch, you create your password. Using this password, your local SQLite database is created and encrypted. You are then shown the table of your passwords, where you can add/delete password records as you wish. These password records are encrypted using your user password, within the already-emcrypted database. And your user login password is unreversibly hashed within the database. Passwords are only shown when clicking "Show Password" within the UI. All sensitive information is hashed (SHA-256) and/or encrypted (AES).
+Upon first launch, you create your password. Using this password, your local SQLite database is created and encrypted. You are then shown the table of your passwords, where you can add/delete password records as you wish. 
+
+These password records are encrypted using your user password, within the already-emcrypted database. And your user login password is unreversibly hashed within the database. Passwords are only shown when clicking "Show Password" within the UI. All sensitive information is hashed (SHA-256) and/or encrypted (AES).
 
 ## Images
 <img width="450" alt="pwm-ss" src="https://github.com/user-attachments/assets/1b98c56d-d75a-4f2b-9fb2-ec9c0a425d0b" />
