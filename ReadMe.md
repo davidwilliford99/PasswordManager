@@ -5,17 +5,17 @@
 A secure, encrypted and completely offline desktop app solution for managing passwords
 
 ## Intended Users
-🔐 Privacy-Conscious Users
+### 🔐 Privacy-Conscious Users
 * People who avoid cloud storage due to concerns over data breaches.
 * Users who prefer local encryption over remote syncing.
 * Those who don’t trust proprietary password managers (LastPass, 1Password, Bitwarden Cloud).
 
-💻 Tech-Savvy & Open-Source Enthusiasts
+### 💻 Tech-Savvy & Open-Source Enthusiasts
 * Linux users and self-hosting advocates.
 * Developers and security researchers who prefer open-source software.
 * People who like to audit and verify code for vulnerabilities.
 
-🏢 Organizations with Strict Security Policies
+### 🏢 Organizations with Strict Security Policies
 * Companies that forbid cloud-based password storage for security reasons.
 * Cybersecurity firms requiring air-gapped password management solutions.
 * Government agencies, defense contractors, and critical infrastructure providers.
