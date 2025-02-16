@@ -50,6 +50,8 @@ import models.User;
 
 
 public class Main extends Application {
+	
+	boolean isDarkMode = false;
 
 	
     @Override
@@ -59,8 +61,26 @@ public class Main extends Application {
         Scene scene = new Scene(layout, 600, 400);
         
         layout.setPadding(new Insets(5)); // padding
+        layout.getStyleClass().add("root");
         
         primaryStage.setTitle("Password Manager");
+        
+        /**
+         * Dark mode logic
+         */
+        Button darkModeButton = new Button("Dark Mode");
+        darkModeButton.setOnAction(e -> {
+            if (isDarkMode) {
+                scene.getStylesheets().clear(); // Remove dark mode
+                darkModeButton.setText("Dark Mode");
+            } else {
+                scene.getStylesheets().add(getClass().getResource("/styles/dark-theme.css").toExternalForm());
+                darkModeButton.setText("Light Mode");
+            }
+            isDarkMode = !isDarkMode;
+        });
+        layout.getChildren().addAll(darkModeButton);
+        
         
         /**
          * Main user object used in application
@@ -325,8 +345,10 @@ public class Main extends Application {
 			mainDashboardUI(layout, user);
     	});
     	
+    	HBox formButtons = new HBox(5, addPasswordButton, cancelPasswordButton);
+    	
         layout.getChildren().remove(1); // remove "add button"
-    	layout.getChildren().addAll(resourceField, passwordField, addPasswordButton, cancelPasswordButton);
+    	layout.getChildren().addAll(resourceField, passwordField, formButtons);
     }
 
     
