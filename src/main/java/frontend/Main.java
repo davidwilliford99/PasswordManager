@@ -280,7 +280,10 @@ public class Main extends Application {
         tableView.setItems(FXCollections.observableArrayList(records));
 
         Button addPasswordButton = new Button("Add Password");
-        addPasswordButton.setOnAction(e -> AddPaswordForm(layout, user));
+        addPasswordButton.setOnAction(e -> {
+        	AddPaswordForm(layout, user);
+        	
+        });
 
         // Render table and button to UI
         layout.getChildren().addAll(tableView, addPasswordButton);
@@ -303,7 +306,6 @@ public class Main extends Application {
     	passwordField.setPromptText("Password");
     	
     	Button addPasswordButton = new Button("Add new password record");
-    	
     	addPasswordButton.setOnAction(e -> {
     		try {
 				DatabaseService.addNewPasswordRecord(
@@ -312,14 +314,19 @@ public class Main extends Application {
 					passwordField.getText(), 
 					user.getEncryptionKey()
 				);
-				
 				// refresh view
 				mainDashboardUI(layout, user);
 			} 
     		catch (Exception e1) {e1.printStackTrace();}
     	});
-        
-    	layout.getChildren().addAll(resourceField, passwordField, addPasswordButton);
+    	
+    	Button cancelPasswordButton = new Button("Cancel");
+    	cancelPasswordButton.setOnAction(e -> {
+			mainDashboardUI(layout, user);
+    	});
+    	
+        layout.getChildren().remove(1); // remove "add button"
+    	layout.getChildren().addAll(resourceField, passwordField, addPasswordButton, cancelPasswordButton);
     }
 
     
