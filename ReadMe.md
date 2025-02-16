@@ -1,14 +1,14 @@
 # Password Manager
 ![Build](https://github.com/davidwilliford99/PasswordManager/actions/workflows/maven-publish.yml/badge.svg)
 
-A secure, encrypted and completely offline desktop app solution for managing passwords.
-
 ## Description
-This is a personal project of mine. Soon to be open source and accepting contributions. 
-This is meant to be a completely offline and open-source password manager. In modern times, it is very unsafe to use the same password for every account you have. Database leaks happen, so it's important that your accounts are all decoupled, random & stored locally on an encrypted volume.
+A secure, encrypted and completely offline desktop app solution for managing passwords. Meant for 
 
 ## Inspiration
-Most password managers cost money, are closed-source and/or require you to connect to the internet to use them. It is very important to trust your password managers. And if you can read each line of code, you can spot any vulnerabilities and fix them yourself. I selected to use Java since my application will be able to run on any machine that has the JVM installed.
+Most password managers cost money, are closed-source and require internet connection (super sketchy). It is very important to trust your password managers, and what better way to build trust than reading the source code for yourself.
+
+## Images
+<img width="450" alt="pwm-ss" src="https://github.com/user-attachments/assets/1b98c56d-d75a-4f2b-9fb2-ec9c0a425d0b" />
 
 ## Stack 
 * Java JDBC
