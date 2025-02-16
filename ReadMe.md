@@ -39,8 +39,7 @@ Upon first launch, you create your password. Using this password, your local SQL
 ![CSS3](https://img.shields.io/badge/css3-%231572B6.svg?style=for-the-badge&logo=css3&logoColor=white)
 ![JavaFX](https://img.shields.io/badge/javafx-%23FF0000.svg?style=for-the-badge&logo=javafx&logoColor=white)
 
-## Backlog before first public release
-* Extend capabilities of UI
-* Style UI
-* Packaging dependencies
-* In-depth testing
+## Installation Instructions
+_Coming Soon_
+
+I am still working on packaging this for Windows, Mac and Linux.
