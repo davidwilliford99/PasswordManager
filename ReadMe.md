@@ -2,7 +2,7 @@
 ![Build](https://github.com/davidwilliford99/PasswordManager/actions/workflows/maven-publish.yml/badge.svg)
 
 ## Description
-A secure, encrypted and completely offline desktop app solution for managing passwords
+A secure, open-source, lightweight and completely offline desktop app solution for managing passwords
 
 ## Intended Users
 ### 🔐 Privacy-Conscious Users
