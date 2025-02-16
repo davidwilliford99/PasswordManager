@@ -22,9 +22,6 @@
 	        <url>https://maven.pkg.github.com/davidwillford99/PasswordManager</url>
 	    </repository>
 	</distributionManagement>
-	
-	
-
 
 
     <dependencies>

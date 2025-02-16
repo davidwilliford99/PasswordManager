@@ -74,7 +74,7 @@ public class Main extends Application {
                 scene.getStylesheets().clear(); // Remove dark mode
                 darkModeButton.setText("Dark Mode");
             } else {
-                scene.getStylesheets().add(getClass().getResource("/styles/dark-theme.css").toExternalForm());
+            	scene.getStylesheets().add(getClass().getClassLoader().getResource("styles/dark-theme.css").toExternalForm());
                 darkModeButton.setText("Light Mode");
             }
             isDarkMode = !isDarkMode;
