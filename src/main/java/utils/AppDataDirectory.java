@@ -10,7 +10,8 @@ public class AppDataDirectory {
     public static final String APP_DATA_PATH = getAppDataPath().toString();
     public static final String PROPERTIES_PATH = Paths.get(APP_DATA_PATH,"properties.txt").toString();
     public static final String DB_PATH = Paths.get(APP_DATA_PATH,"database.db").toString();
-    public static final String DB_URL = Paths.get(APP_DATA_PATH,"jdbc:sqlite:", DB_PATH).toString();
+    public static final String DB_URL = "jdbc:sqlite:" + DB_PATH;
+
 
     /**
      * Returns the platform-specific application data directory path.
