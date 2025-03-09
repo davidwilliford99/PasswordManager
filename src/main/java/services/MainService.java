@@ -1,25 +1,27 @@
 package services;
 
 import static utils.AppDataDirectory.doesAppDataDirectoryExist;
-import static utils.AppDataDirectory.createAppDataDirectory;;
+import static utils.AppDataDirectory.createAppDataDirectory;
+import static utils.AppDataDirectory.doesDbFileExist;
 
-
+/**
+ * Handles application setup and initialization tasks.
+ */
 public class MainService {
 
 	/**
-	 * @description Checks if application's first start
+	 * Checks if application's first start
 	 * 
-	 * @return
+	 * @return False if either the app directory or .db file doesn't exist
 	 */
 	public static boolean isFirstStart() {
-		return !doesAppDataDirectoryExist();
+		return !doesAppDataDirectoryExist() || !doesDbFileExist();
 	}
 
 	/**
-	 * @title Bootstrap
-	 * 
-	 * @description Boot straps the project.
-	 * @description Create SQLite tables
+	 * Initializes the project by setting up necessary directories and database tables.
+	 *
+	 * @param userKey The user key used for database encryption or setup.
 	 */
 	public static void bootstrap(String userKey) {
 		createAppDataDirectory();

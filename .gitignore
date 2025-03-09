@@ -3,4 +3,5 @@
 .project
 .settings
 .vscode
+.idea
 /custom-jre/

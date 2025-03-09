@@ -1,14 +1,20 @@
 package utils;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.File;
+import java.util.stream.Stream;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class AppDataDirectory {
+    private static final Logger logger = LogManager.getLogger(AppDataDirectory.class);
 
     public static final String APP_NAME = "PasswordManager";
     public static final String APP_DATA_PATH = getAppDataPath().toString();
-    public static final String PROPERTIES_PATH = Paths.get(APP_DATA_PATH,"properties.txt").toString();
     public static final String DB_PATH = Paths.get(APP_DATA_PATH,"database.db").toString();
     public static final String DB_URL = "jdbc:sqlite:" + DB_PATH;
 
@@ -54,4 +60,28 @@ public class AppDataDirectory {
         File dir = path.toFile();
         return dir.exists() && dir.isDirectory();
     }
+
+    /**
+     * Checks if there is an existing .db file in app data directory
+     *
+     * @return true if a file with the .db extension exists, false otherwise
+     */
+    public static boolean doesDbFileExist() {
+        if (!doesAppDataDirectoryExist()) {
+            return false;
+        }
+
+        Path path = getAppDataPath();
+
+        try (Stream<Path> stream = Files.list(path)) {
+            return stream
+                .filter(Files::isRegularFile)
+                .anyMatch(p -> p.toString().endsWith(".db"));
+        } catch (IOException e) {
+            logger.error("An error occurred while looking for existing database", e);
+            return false;
+        }
+
+    }
+
 }
