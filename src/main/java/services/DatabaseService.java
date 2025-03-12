@@ -1,301 +1,258 @@
 package services;
 
-import java.util.*;
-import java.sql.*;
-import java.io.*;
-
+import java.io.File;
+import java.io.UnsupportedEncodingException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import models.PasswordRecord;
 import models.User;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import utils.SqlQueries;
 
 import static utils.AppDataDirectory.DB_PATH;
 import static utils.AppDataDirectory.DB_URL;
 
 /**
- * @description Static methods for database queries
+ * Static methods for database queries
  */
 public class DatabaseService {
+  private static final Logger logger = LogManager.getLogger(DatabaseService.class);
 
-	/**
-	 * 
-	 * @description Connects to database
-	 * 
-	 * @return Connection object
-	 *
-	 */
-	private static Connection connect(String userKey) throws SQLException {
+  /**
+   * Connects to the database and applies the encryption key.
+   *
+   * @param userKey The encryption key for the database.
+   * @return A Connection object to the database.
+   * @throws SQLException If a database access error occurs.
+   */
+  private static Connection connect(String userKey) throws SQLException {
+    Connection conn = DriverManager.getConnection(DB_URL);
+    try (Statement stmt = conn.createStatement()) {
+      // PRAGMA statements must be executed as raw SQL, not prepared statements
+      stmt.execute("PRAGMA key = '" + userKey + "';");
+    } catch (SQLException e) {
+      logger.error("An SQL error occurred while fetching data", e);
+    }
+    return conn;
+  }
 
-		Connection conn = DriverManager.getConnection(DB_URL);
-		String hashedKey = userKey;
+  /**
+   * Creates and sets up the database tables needed for the application. Also sets up the encryption
+   * for the database.
+   *
+   * @param userKey The encryption key for the database.
+   */
+  public static void tableSetup(String userKey) {
+    try {
+      File dbFile = new File(DB_PATH);
+      boolean isNewDatabase = !dbFile.exists();
 
-		try {
-			Statement stmt = conn.createStatement();
-			stmt.execute("PRAGMA key = '" + hashedKey + "';");
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
+      if (isNewDatabase) {
+        dbFile.createNewFile();
+      }
 
-		return conn;
-	}
+      try (Connection conn = connect(userKey);
+          Statement stmt = conn.createStatement()) {
 
-	/**
-	 * 
-	 * @description Create and set up the database tables needed for the application
-	 * @description Also sets up the encryption
-	 * 
-	 * @param Database encryption key
-	 * 
-	 */
-	public static void tableSetup(String userKey) {
-		try {
-			File dbFile = new File(DB_PATH);
-			boolean isNewDatabase = !dbFile.exists();
+        stmt.execute("PRAGMA key = '" + CryptoService.hash(userKey) + "';");
 
-			if (isNewDatabase) {
-				dbFile.createNewFile();
-			}
+        if (!isNewDatabase) {
+          stmt.execute(SqlQueries.PRAGMA_CIPHER_MIGRATE);
+        }
 
-			// Connect to the database and apply encryption
-			Connection connect = connect(userKey);
-			Statement stmt = connect.createStatement();
+        stmt.execute(SqlQueries.CREATE_USERS_TABLE);
+        stmt.execute(SqlQueries.CREATE_PASSWORD_RECORDS_TABLE);
+      }
 
-			// 🔹 Apply encryption key for SQLCipher
-			stmt.execute("PRAGMA key = '" + CryptoService.hash(userKey) + "';");
+      logger.info("Database setup complete and encrypted.");
 
-			// 🔹 If the database already exists, migrate it to encryption
-			if (!isNewDatabase) {
-				stmt.execute("PRAGMA cipher_migrate;");
-			}
+    } catch (Exception e) {
+      logger.error("An error occurred while creating the table", e);
+    }
+  }
 
-			// Create tables
-			String createUsersTable = "CREATE TABLE IF NOT EXISTS users ("
-					+ "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-					+ "password TEXT NOT NULL"
-					+ ");";
+  /**
+   * Adds a new password record to the database.
+   *
+   * @param userId   The ID of the user associated with the password record.
+   * @param resource The resource (e.g., website or app) for the password.
+   * @param password The password to store.
+   * @param userKey  The encryption key for the database.
+   * @return The newly created PasswordRecord.
+   * @throws Exception If an error occurs during the operation.
+   */
+  public static PasswordRecord addNewPasswordRecord(int userId, String resource, String password,
+      String userKey)
+      throws Exception {
 
-			String createPasswordRecordsTable = "CREATE TABLE IF NOT EXISTS password_records ("
-					+ "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-					+ "user_id INTEGER NOT NULL, "
-					+ "resource TEXT NOT NULL UNIQUE, "
-					+ "password TEXT NOT NULL, "
-					+ "FOREIGN KEY (user_id) REFERENCES users(id)"
-					+ ");";
+    try (Connection conn = connect(userKey);
+        PreparedStatement pstmt = conn.prepareStatement(SqlQueries.INSERT_PASSWORD_RECORD)) {
 
-			stmt.execute(createUsersTable);
-			stmt.execute(createPasswordRecordsTable);
+      pstmt.setInt(1, userId);
+      pstmt.setString(2, resource);
+      pstmt.setString(3, CryptoService.encrypt(password, userKey));
 
-			connect.close();
-			System.out.println("Database setup complete and encrypted.");
+      pstmt.executeUpdate();
+    } catch (SQLException e) {
+      logger.error("An error occurred while adding a new record", e);
+    }
+    return getPasswordRecord(resource, userKey);
+  }
 
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+  /**
+   * Retrieves a password record by its resource string.
+   *
+   * @param resource The resource (e.g., website or app) for the password.
+   * @param userKey  The encryption key for the database.
+   * @return The PasswordRecord associated with the resource.
+   * @throws Exception If an error occurs during the operation.
+   */
+  public static PasswordRecord getPasswordRecord(String resource, String userKey)
+      throws Exception {
 
-	/**
-	 * @param userId
-	 * @param resource
-	 * @param password
-	 * @throws Exception
-	 * 
-	 * @description Add new Password Record to Database
-	 */
-	public static PasswordRecord addNewPasswordRecord(int userId, String resource, String password, String userKey)
-			throws Exception {
+    PasswordRecord record = null;
 
-		String addNewPasswordRecord = String.format(
-				"INSERT INTO password_records(user_id, resource, password) "
-						+ "VALUES(%d, '%s', '%s');", // 🔹 Ensure user_id matches table definition
-				userId, resource, CryptoService.encrypt(password, userKey));
+    try (Connection conn = connect(userKey);
+        PreparedStatement pstmt = conn.prepareStatement(SqlQueries.SELECT_PASSWORD_RECORD)) {
 
-		try {
-			Connection connect = connect(userKey);
-			Statement stmt = connect.createStatement();
-			stmt.execute(addNewPasswordRecord);
-			connect.close();
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
+      pstmt.setString(1, resource);
 
-		PasswordRecord newRecord = getPasswordRecord(resource, userKey);
-		return newRecord; // return id of new record
-	}
+      try (ResultSet rs = pstmt.executeQuery()) {
+        if (rs.next()) {
+          record = new PasswordRecord(
+              rs.getInt("id"),
+              rs.getInt("user_id"),
+              rs.getString("resource"),
+              rs.getString("password"));
+        }
+      }
+    } catch (SQLException e) {
+      logger.error("An error occurred while getting record {}", record, e);
+    }
+    return record;
+  }
 
-	/**
-	 * @description Getting password records by their resource string
-	 * 
-	 * @param resource
-	 * @return List of fields from table
-	 * @throws Exception
-	 * @throws NumberFormatException
-	 */
-	public static PasswordRecord getPasswordRecord(String resource, String userKey)
-			throws NumberFormatException, Exception {
+  /**
+   * Retrieves all password records for a user.
+   *
+   * @param userId  The ID of the user.
+   * @param userKey The encryption key for the database.
+   * @return A list of PasswordRecords for the user.
+   */
+  public static List<PasswordRecord> getAllPasswordRecords(int userId, String userKey) {
 
-		String getPasswordRecordQuery = String.format(
-				"SELECT * from password_records WHERE resource='%s'",
-				resource);
+    List<PasswordRecord> passwordRecords = new ArrayList<>();
 
-		List<String> row = new ArrayList<String>();
+    try (Connection conn = connect(userKey);
+        PreparedStatement pstmt = conn.prepareStatement(SqlQueries.SELECT_ALL_PASSWORD_RECORDS)) {
 
-		try {
-			Connection connect = connect(userKey);
-			Statement stmt = connect.createStatement();
-			ResultSet queryResult = stmt.executeQuery(getPasswordRecordQuery);
+      pstmt.setInt(1, userId);
 
-			if (queryResult.next()) {
-				int columnCount = queryResult.getMetaData().getColumnCount();
-				for (int i = 1; i <= columnCount; i++) {
-					row.add(queryResult.getString(i));
-				}
-			}
+      try (ResultSet rs = pstmt.executeQuery()) {
+        while (rs.next()) {
+          PasswordRecord record = new PasswordRecord(
+              rs.getInt("id"),
+              rs.getInt("user_id"),
+              rs.getString("resource"),
+              rs.getString("password"));
+          passwordRecords.add(record);
+        }
+      }
+    } catch (SQLException e) {
+      logger.error("An error occurred getting all password records", e);
+    }
+    return passwordRecords;
+  }
 
-			connect.close();
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
+  /**
+   * Deletes a password record by its resource string.
+   *
+   * @param resource The resource (e.g., website or app) for the password.
+   * @param userKey  The encryption key for the database.
+   * @return True if the deletion was successful, false otherwise.
+   */
+  public static boolean deletePasswordRecord(String resource, String userKey) {
 
-		PasswordRecord record = new PasswordRecord(
-				Integer.parseInt(row.get(0)),
-				Integer.parseInt(row.get(1)),
-				row.get(2),
-				row.get(3));
+    try (Connection conn = connect(userKey);
+        PreparedStatement pstmt = conn.prepareStatement(SqlQueries.DELETE_PASSWORD_RECORD)) {
 
-		return record;
-	}
+      pstmt.setString(1, resource);
 
-	/**
-	 * 
-	 * @description Return all password records for the user
-	 *
-	 * @return Array of PasswordRecords
-	 * 
-	 */
-	public static List<PasswordRecord> getAllPasswordRecords(int userId, String userKey) {
+      pstmt.executeUpdate();
+      return true;
+    } catch (SQLException e) {
+      logger.error("An error occurred while deleting record {}", resource, e);
+      return false;
+    }
+  }
 
-		String allPaswordRecordsQuery = String.format(
-				"SELECT * from password_records WHERE user_id=%d",
-				userId);
+  /**
+   * Adds a new user to the database.
+   *
+   * @param password The user's password.
+   * @param userKey  The encryption key for the database.
+   * @return The newly created User.
+   */
+  public static User addNewUser(String password, String userKey) {
 
-		List<PasswordRecord> passwordRecords = new ArrayList<PasswordRecord>();
+    String hashedPassword = "";
+    try {
+      hashedPassword = CryptoService.hash(password);
+    } catch (UnsupportedEncodingException e) {
+      logger.error("An error occurred while hashing password for new user", e);
+    }
 
-		try {
-			Connection connect = connect(userKey);
-			Statement stmt = connect.createStatement();
-			ResultSet queryResult = stmt.executeQuery(allPaswordRecordsQuery);
+    try (Connection conn = connect(userKey);
+        PreparedStatement pstmt = conn.prepareStatement(SqlQueries.INSERT_USER)) {
 
-			// Build query result (multiple rows) into list of PasswordRecords
-			while (queryResult.next()) {
-				PasswordRecord record = new PasswordRecord(
-						queryResult.getInt("id"),
-						queryResult.getInt("user_id"),
-						queryResult.getString("resource"),
-						queryResult.getString("password"));
-				passwordRecords.add(record);
-			}
+      pstmt.setString(1, hashedPassword);
 
-			connect.close();
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
+      pstmt.executeUpdate();
+    } catch (SQLException e) {
+      logger.error("An error occurred while adding new user", e);
+    }
+    return getUser(password, userKey);
+  }
 
-		return passwordRecords;
-	}
+  /**
+   * Retrieves a user by their password.
+   *
+   * @param password The user's password.
+   * @param userKey  The encryption key for the database.
+   * @return The User associated with the password.
+   */
+  public static User getUser(String password, String userKey) {
 
-	/**
-	 * @description Getting password records by their resource string
-	 * 
-	 * @param resource
-	 * @return List of fields from table
-	 * @throws Exception
-	 * @throws NumberFormatException
-	 */
-	public static boolean deletePasswordRecord(String resource, String userKey) {
+    String hashedPassword = "";
+    try {
+      hashedPassword = CryptoService.hash(password);
+    } catch (UnsupportedEncodingException e) {
+      logger.error("An error occurred while hashing user's password", e);
+    }
 
-		String getPasswordRecordQuery = String.format(
-				"DELETE FROM password_records WHERE resource = '%s'",
-				resource);
+    User user = new User("password");
 
-		try {
-			Connection connect = connect(userKey);
-			Statement stmt = connect.createStatement();
-			stmt.executeQuery(getPasswordRecordQuery);
+    try (Connection conn = connect(userKey);
+        PreparedStatement pstmt = conn.prepareStatement(SqlQueries.SELECT_USER)) {
 
-			connect.close();
-		} catch (SQLException e) {
-			e.printStackTrace();
-			return false;
-		}
+      pstmt.setString(1, hashedPassword);
 
-		return true;
-	}
-
-	/**
-	 * @param password
-	 * 
-	 * @description Add new Password Record to DB
-	 */
-	public static User addNewUser(String password, String userKey) {
-
-		String hashedPassword = "";
-		try {
-			hashedPassword = CryptoService.hash(password);
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		}
-
-		String addNewUser = String.format(
-				"INSERT INTO users(password) VALUES('%s');",
-				hashedPassword);
-
-		try {
-			Connection connect = connect(userKey);
-			Statement stmt = connect.createStatement();
-			stmt.execute(addNewUser);
-			connect.close();
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
-
-		User newUser = getUser(password, userKey);
-		return newUser;
-	}
-
-	/**
-	 * @param password
-	 * @param userKey
-	 * 
-	 * @description Get user record from DB
-	 */
-	public static User getUser(String password, String userKey) {
-
-		String hashedPassword = "";
-		try {
-			hashedPassword = CryptoService.hash(password);
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		}
-
-		String getUserQuery = String.format(
-				"SELECT * FROM users WHERE password = '%s'",
-				hashedPassword);
-
-		User user = new User("password");
-
-		try {
-			Connection connect = connect(userKey);
-			Statement stmt = connect.createStatement();
-			ResultSet queryResult = stmt.executeQuery(getUserQuery);
-
-			if (queryResult.next()) {
-				user.setId(queryResult.getInt("id"));
-				user.setPassword(queryResult.getString("password"));
-			}
-			connect.close();
-		}
-
-		catch (SQLException e) {
-			e.printStackTrace();
-		}
-		return user;
-	}
+      try (ResultSet rs = pstmt.executeQuery()) {
+        if (rs.next()) {
+          user.setId(rs.getInt("id"));
+          user.setPassword(rs.getString("password"));
+        }
+      }
+    } catch (SQLException e) {
+      logger.error("An error occurred while getting user", e);
+    }
+    return user;
+  }
 }
