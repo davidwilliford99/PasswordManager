@@ -1,5 +1,14 @@
 package frontend;
 
+import dal.IUserDao;
+import dal.IPasswordRecordDao;
+import dal.UserDao;
+import dal.PasswordRecordDao;
+import bal.UserBal;
+import bal.PasswordRecordBal;
+import dependencies.sql.DatabaseInitializer;
+import models.PasswordRecord;
+import models.User;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Optional;
@@ -20,14 +29,16 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import services.CryptoService;
-import services.DatabaseService;
-import services.MainService;
-import services.UserService;
-import models.PasswordRecord;
-import models.User;
+import services.ICryptoService;
+
+import static utils.AppDataDirectory.isFirstStart;
 
 /**
  * An offline and open-source password manager application.
@@ -52,12 +63,29 @@ import models.User;
  * @author David Williford
  */
 public class Main extends Application {
+
   private static final Logger logger = LogManager.getLogger(Main.class);
 
   private boolean isDarkMode = false;
+  private ICryptoService cryptoService;
+  private UserBal userBal;
+  private PasswordRecordBal passwordRecordBal;
+  private DatabaseInitializer databaseInitializer;
 
   @Override
-  public void start(Stage primaryStage) {
+  public void start(Stage primaryStage) throws NoSuchPaddingException, NoSuchAlgorithmException {
+    Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    cryptoService = new CryptoService(cipher, digest);
+
+    IUserDao userDao = new UserDao(cryptoService);
+    IPasswordRecordDao passwordRecordDao = new PasswordRecordDao(cryptoService);
+
+    userBal = new UserBal(userDao, cryptoService);
+    passwordRecordBal = new PasswordRecordBal(passwordRecordDao);
+
+    databaseInitializer = new DatabaseInitializer(cryptoService);
+
     VBox layout = new VBox(10);
     Scene scene = new Scene(layout, 600, 400);
 
@@ -66,15 +94,13 @@ public class Main extends Application {
 
     primaryStage.setTitle("Password Manager");
 
-    // Dark mode toggle button
     Button darkModeButton = new Button("Dark Mode");
     darkModeButton.setOnAction(e -> toggleDarkMode(scene, darkModeButton));
     layout.getChildren().add(darkModeButton);
 
-    // Main user object used in the application
     User user = null;
 
-    if (MainService.isFirstStart()) {
+    if (isFirstStart()) {
       setupFirstStartUI(layout, user);
     } else {
       setupAuthenticationUI(layout, user);
@@ -131,13 +157,12 @@ public class Main extends Application {
    */
   private void handleFirstStart(String password, VBox layout, User user) {
     try {
-      MainService.bootstrap(CryptoService.hash(password));
+      databaseInitializer.bootstrap(cryptoService.hash(password));
     } catch (UnsupportedEncodingException e) {
       logger.error("Error occurred while hashing password for database");
     }
 
-    user = new User(password);
-    user.save();
+    user = userBal.createUser(password);
     mainDashboardUI(layout, user);
   }
 
@@ -168,12 +193,12 @@ public class Main extends Application {
    * @param user The user object.
    */
   private void handleAuthentication(String password, Label outputLabel, VBox layout, User user) {
-    boolean authStatus = UserService.authenticate(password);
+    boolean authStatus = userBal.authenticateUser(password);
 
     if (authStatus) {
       outputLabel.setText("Authentication successful!");
       try {
-        user = DatabaseService.getUser(password, CryptoService.hash(password));
+        user = userBal.getUser(password, cryptoService.hash(password));
       } catch (UnsupportedEncodingException e) {
         logger.error("Error occurred while hashing password", e);
       }
@@ -193,7 +218,7 @@ public class Main extends Application {
   private void mainDashboardUI(VBox layout, User user) {
     layout.getChildren().clear();
 
-    List<PasswordRecord> records = DatabaseService.getAllPasswordRecords(user.getId(), user.getEncryptionKey());
+    List<PasswordRecord> records = passwordRecordBal.getAllPasswordRecords(user.getId(), user.getEncryptionKey());
 
     TableView<PasswordRecord> tableView = new TableView<>();
 
@@ -202,10 +227,12 @@ public class Main extends Application {
 
     TableColumn<PasswordRecord, Void> showPasswordColumn = new TableColumn<>("Show Password");
     showPasswordColumn.setPrefWidth(400);
-    showPasswordColumn.setCellFactory(param -> new PasswordVisibilityCell(user));
+    showPasswordColumn.setCellFactory(param ->
+        new PasswordVisibilityCell(user, cryptoService));
 
     TableColumn<PasswordRecord, Void> deletePasswordColumn = new TableColumn<>("");
-    deletePasswordColumn.setCellFactory(param -> new DeletePasswordCell(user, tableView));
+    deletePasswordColumn.setCellFactory(
+        param -> new DeletePasswordCell(user, tableView, passwordRecordBal));
 
     tableView.getColumns().addAll(resourceColumn, showPasswordColumn, deletePasswordColumn);
     tableView.setItems(FXCollections.observableArrayList(records));
@@ -232,7 +259,7 @@ public class Main extends Application {
     Button addPasswordButton = new Button("Add new password record");
     addPasswordButton.setOnAction(e -> {
       try {
-        DatabaseService.addNewPasswordRecord(user.getId(), resourceField.getText(), passwordField.getText(), user.getEncryptionKey());
+        passwordRecordBal.addPasswordRecord(user.getId(), resourceField.getText(), passwordField.getText(), user.getEncryptionKey());
         mainDashboardUI(layout, user);
       } catch (Exception e1) {
         logger.error("Error occurred while adding new password record", e1);
@@ -244,7 +271,7 @@ public class Main extends Application {
 
     HBox formButtons = new HBox(5, addPasswordButton, cancelPasswordButton);
 
-    layout.getChildren().remove(1); // Remove "Add Password" button
+    layout.getChildren().remove(1);
     layout.getChildren().addAll(resourceField, passwordField, formButtons);
   }
 
@@ -265,9 +292,11 @@ public class Main extends Application {
     private final TextField passwordLabel = new TextField("**********");
     private boolean isPasswordVisible = false;
     private final User user;
+    private final ICryptoService cryptoService;
 
-    PasswordVisibilityCell(User user) {
+    PasswordVisibilityCell(User user, ICryptoService cryptoService) {
       this.user = user;
+      this.cryptoService = cryptoService;
       passwordLabel.setEditable(false);
       passwordLabel.setFocusTraversable(false);
       showButton.setPrefWidth(120);
@@ -282,7 +311,7 @@ public class Main extends Application {
         showButton.setText("Show Password");
       } else {
         try {
-          String decryptedPassword = CryptoService.decrypt(record.getPassword(), user.getEncryptionKey());
+          String decryptedPassword = cryptoService.decrypt(record.getPassword(), user.getEncryptionKey());
           passwordLabel.setText(decryptedPassword);
         } catch (Exception e) {
           logger.error("Error occurred while decrypting password", e);
@@ -310,10 +339,12 @@ public class Main extends Application {
     private final Button deleteButton = new Button("Delete");
     private final User user;
     private final TableView<PasswordRecord> tableView;
+    private final PasswordRecordBal passwordRecordBal;
 
-    DeletePasswordCell(User user, TableView<PasswordRecord> tableView) {
+    DeletePasswordCell(User user, TableView<PasswordRecord> tableView, PasswordRecordBal passwordRecordBal) {
       this.user = user;
       this.tableView = tableView;
+      this.passwordRecordBal = passwordRecordBal;
       deleteButton.setPrefWidth(80);
 
       deleteButton.setOnAction(event -> confirmAndDeletePassword());
@@ -329,7 +360,7 @@ public class Main extends Application {
 
       Optional<ButtonType> result = alert.showAndWait();
       if (result.isPresent() && result.get() == ButtonType.OK) {
-        DatabaseService.deletePasswordRecord(record.getResource(), user.getEncryptionKey());
+        passwordRecordBal.deletePasswordRecord(record.getResource(), user.getEncryptionKey());
         tableView.getItems().remove(record);
       }
     }
