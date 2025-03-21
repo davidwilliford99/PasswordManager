@@ -1,8 +1,7 @@
 package dal;
 
-import dependencies.sql.ConnectionManager;
+import dependencies.sql.connection.IConnectionManager;
 import models.PasswordRecord;
-import services.ICryptoService;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,96 +24,101 @@ public class PasswordRecordDao implements IPasswordRecordDao {
   private static final String SELECT_ALL_PASSWORD_RECORDS = "SELECT * FROM password_records WHERE user_id=?;";
   private static final String DELETE_PASSWORD_RECORD = "DELETE FROM password_records WHERE resource=?;";
 
-  private final ConnectionManager connection;
-  private final ICryptoService cryptoService;
+  private final IConnectionManager connectionManager;
 
   /**
-   * Constructs a PasswordRecordDao instance with the provided crypto service.
+   * Constructs a PasswordRecordDao instance.
    *
-   * @param cryptoService The service for cryptographic operations.
+   * @param connectionManager The connection manager for database operations.
    */
-  public PasswordRecordDao(ICryptoService cryptoService) {
-    this.connection = ConnectionManager.getInstance();
-    this.cryptoService = cryptoService;
+  public PasswordRecordDao(IConnectionManager connectionManager) {
+    this.connectionManager = connectionManager;
   }
 
   @Override
-  public PasswordRecord addNewPasswordRecord(int userId, String resource, String password,
-      String userKey) {
-    try (Connection conn = connection.connect(userKey);
+  public PasswordRecord addNewPasswordRecord(int userId, String resource, String hashedPassword, String userKey) {
+    try (Connection conn = connectionManager.connect(userKey);
         PreparedStatement pstmt = conn.prepareStatement(INSERT_PASSWORD_RECORD)) {
 
       pstmt.setInt(1, userId);
       pstmt.setString(2, resource);
-      pstmt.setString(3, cryptoService.encrypt(password, userKey));
-
+      pstmt.setString(3, hashedPassword);
       pstmt.executeUpdate();
+
+      logger.info("Added new password record for resource: {}", resource);
+      return getPasswordRecord(resource, userKey);
     } catch (Exception e) {
-      logger.error("An error occurred while adding a new record", e);
+      logger.error("An error occurred while adding a new password record for resource: {}", resource, e);
+      return null;
     }
-    return getPasswordRecord(resource, userKey);
   }
 
   @Override
   public PasswordRecord getPasswordRecord(String resource, String userKey) {
-    PasswordRecord record = null;
-
-    try (Connection conn = connection.connect(userKey);
+    try (Connection conn = connectionManager.connect(userKey);
         PreparedStatement pstmt = conn.prepareStatement(SELECT_PASSWORD_RECORD)) {
 
       pstmt.setString(1, resource);
 
       try (ResultSet rs = pstmt.executeQuery()) {
         if (rs.next()) {
-          record = new PasswordRecord(
-              rs.getInt("id"),
-              rs.getInt("user_id"),
-              rs.getString("resource"),
-              rs.getString("password"));
+          return mapResultSetToPasswordRecord(rs);
         }
       }
     } catch (Exception e) {
-      logger.error("An error occurred while getting record", e);
+      logger.error("An error occurred while getting password record for resource: {}", resource, e);
     }
-    return record;
+    return null;
   }
 
   @Override
   public List<PasswordRecord> getAllPasswordRecords(int userId, String userKey) {
     List<PasswordRecord> passwordRecords = new ArrayList<>();
 
-    try (Connection conn = connection.connect(userKey);
+    try (Connection conn = connectionManager.connect(userKey);
         PreparedStatement pstmt = conn.prepareStatement(SELECT_ALL_PASSWORD_RECORDS)) {
 
       pstmt.setInt(1, userId);
 
       try (ResultSet rs = pstmt.executeQuery()) {
         while (rs.next()) {
-          PasswordRecord record = new PasswordRecord(
-              rs.getInt("id"),
-              rs.getInt("user_id"),
-              rs.getString("resource"),
-              rs.getString("password"));
-          passwordRecords.add(record);
+          passwordRecords.add(mapResultSetToPasswordRecord(rs));
         }
       }
     } catch (Exception e) {
-      logger.error("An error occurred getting all password records", e);
+      logger.error("An error occurred while getting all password records for user ID: {}", userId, e);
     }
     return passwordRecords;
   }
 
   @Override
   public boolean deletePasswordRecord(String resource, String userKey) {
-    try (Connection conn = connection.connect(userKey);
+    try (Connection conn = connectionManager.connect(userKey);
         PreparedStatement pstmt = conn.prepareStatement(DELETE_PASSWORD_RECORD)) {
 
       pstmt.setString(1, resource);
       pstmt.executeUpdate();
+
+      logger.info("Deleted password record for resource: {}", resource);
       return true;
     } catch (Exception e) {
-      logger.error("An error occurred while deleting record", e);
+      logger.error("An error occurred while deleting password record for resource: {}", resource, e);
       return false;
     }
+  }
+
+  /**
+   * Maps a ResultSet row to a PasswordRecord object.
+   *
+   * @param rs The ResultSet containing password record data.
+   * @return A PasswordRecord object populated with data from the ResultSet.
+   * @throws Exception If a database access error occurs.
+   */
+  private PasswordRecord mapResultSetToPasswordRecord(ResultSet rs) throws Exception {
+    return new PasswordRecord(
+        rs.getInt("id"),
+        rs.getInt("user_id"),
+        rs.getString("resource"),
+        rs.getString("password"));
   }
 }

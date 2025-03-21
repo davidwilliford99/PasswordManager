@@ -1,7 +1,6 @@
 package dal;
 
-import dependencies.sql.ConnectionManager;
-import services.ICryptoService;
+import dependencies.sql.connection.IConnectionManager;
 import models.User;
 
 import org.apache.logging.log4j.LogManager;
@@ -11,7 +10,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.io.UnsupportedEncodingException;
 
 /**
  * Provides database operations for users.
@@ -23,29 +21,17 @@ public class UserDao implements IUserDao {
   private static final String INSERT_USER = "INSERT INTO users(password, encryption_key) VALUES(?, ?);";
   private static final String SELECT_USER = "SELECT * FROM users WHERE password=?;";
 
-  private final ConnectionManager connection;
-  private final ICryptoService cryptoService;
+  private final IConnectionManager connection;
 
   /**
-   * Constructs a UserDao instance with the provided crypto service.
-   *
-   * @param cryptoService The service for cryptographic operations.
-   */
-  public UserDao(ICryptoService cryptoService) {
-    this.connection = ConnectionManager.getInstance();
-    this.cryptoService = cryptoService;
+   * Constructs a UserDao instance
+   **/
+  public UserDao(IConnectionManager connectionManager) {
+    this.connection = connectionManager;
   }
 
   @Override
-  public User addNewUser(String password, String userKey) {
-    String hashedPassword = "";
-    try {
-      hashedPassword = cryptoService.hash(password);
-    } catch (UnsupportedEncodingException e) {
-      logger.error("An error occurred while hashing password for new user", e);
-      return null;
-    }
-
+  public User addNewUser(String hashedPassword, String userKey) {
     try (Connection conn = connection.connect(userKey);
         PreparedStatement pstmt = conn.prepareStatement(INSERT_USER)) {
 
@@ -56,21 +42,11 @@ public class UserDao implements IUserDao {
       logger.error("An error occurred while adding new user", e);
       return null;
     }
-    return getUser(password, userKey);
+    return getUser(hashedPassword, userKey);
   }
 
   @Override
-  public User getUser(String password, String userKey) {
-    String hashedPassword = "";
-    try {
-      hashedPassword = cryptoService.hash(password);
-    } catch (UnsupportedEncodingException e) {
-      logger.error("An error occurred while hashing user's password", e);
-      return null;
-    }
-
-    User user = new User("password");
-
+  public User getUser(String hashedPassword, String userKey) {
     try (Connection conn = connection.connect(userKey);
         PreparedStatement pstmt = conn.prepareStatement(SELECT_USER)) {
 
@@ -78,15 +54,26 @@ public class UserDao implements IUserDao {
 
       try (ResultSet rs = pstmt.executeQuery()) {
         if (rs.next()) {
-          user.setId(rs.getInt("id"));
-          user.setPassword(rs.getString("password"));
-          user.setEncryptionKey(rs.getString("encryption_key"));
+          return mapResultSetToUser(rs);
         }
       }
     } catch (SQLException e) {
       logger.error("An error occurred while getting user", e);
-      return null;
     }
+    return null;
+  }
+
+  /**
+   * Maps a ResultSet row to a User object.
+   *
+   * @param rs The ResultSet containing user data.
+   * @return A User object populated with data from the ResultSet.
+   * @throws SQLException If a database access error occurs.
+   */
+  private User mapResultSetToUser(ResultSet rs) throws SQLException {
+    User user = new User(rs.getString("password"));
+    user.setId(rs.getInt("id"));
+    user.setEncryptionKey(rs.getString("encryption_key"));
     return user;
   }
 }

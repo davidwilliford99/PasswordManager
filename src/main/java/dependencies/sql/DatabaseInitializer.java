@@ -1,5 +1,6 @@
 package dependencies.sql;
 
+import dependencies.sql.connection.IConnectionManager;
 import services.ICryptoService;
 
 import org.apache.logging.log4j.LogManager;
@@ -35,17 +36,19 @@ public class DatabaseInitializer {
           + "FOREIGN KEY (user_id) REFERENCES users(id)"
           + ");";
 
-  private final ConnectionManager connectionManager;
+  private final IConnectionManager connectionManager;
   private final ICryptoService cryptoService;
 
   /**
-   * Constructs a DatabaseInitializer instance with the provided crypto service.
+   * Constructs a DatabaseInitializer instance with the provided crypto service and connection
+   * manager.
    *
-   * @param cryptoService The service for cryptographic operations.
+   * @param cryptoService     The service for cryptographic operations.
+   * @param connectionManager The connection manager for database operations.
    */
-  public DatabaseInitializer(ICryptoService cryptoService) {
-    this.connectionManager = ConnectionManager.getInstance();
+  public DatabaseInitializer(ICryptoService cryptoService, IConnectionManager connectionManager) {
     this.cryptoService = cryptoService;
+    this.connectionManager = connectionManager;
   }
 
   /**

@@ -6,7 +6,9 @@ import dal.UserDao;
 import dal.PasswordRecordDao;
 import bal.UserBal;
 import bal.PasswordRecordBal;
+import dependencies.sql.connection.ConnectionManager;
 import dependencies.sql.DatabaseInitializer;
+import dependencies.sql.connection.IConnectionManager;
 import models.PasswordRecord;
 import models.User;
 import java.io.UnsupportedEncodingException;
@@ -78,13 +80,19 @@ public class Main extends Application {
     MessageDigest digest = MessageDigest.getInstance("SHA-256");
     cryptoService = new CryptoService(cipher, digest);
 
-    IUserDao userDao = new UserDao(cryptoService);
-    IPasswordRecordDao passwordRecordDao = new PasswordRecordDao(cryptoService);
+    IConnectionManager connectionManager = new ConnectionManager();
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      connectionManager.closePool();
+      logger.info("Connection pool closed via shutdown hook.");
+    }));
+
+    IUserDao userDao = new UserDao(connectionManager);
+    IPasswordRecordDao passwordRecordDao = new PasswordRecordDao(connectionManager);
 
     userBal = new UserBal(userDao, cryptoService);
-    passwordRecordBal = new PasswordRecordBal(passwordRecordDao);
+    passwordRecordBal = new PasswordRecordBal(passwordRecordDao, cryptoService);
 
-    databaseInitializer = new DatabaseInitializer(cryptoService);
+    databaseInitializer = new DatabaseInitializer(cryptoService, connectionManager);
 
     VBox layout = new VBox(10);
     Scene scene = new Scene(layout, 600, 400);
@@ -105,6 +113,11 @@ public class Main extends Application {
     } else {
       setupAuthenticationUI(layout, user);
     }
+
+    primaryStage.setOnCloseRequest(event -> {
+      connectionManager.closePool();
+      logger.info("Connection pool closed via application close event.");
+    });
 
     primaryStage.setScene(scene);
     primaryStage.show();
@@ -197,11 +210,7 @@ public class Main extends Application {
 
     if (authStatus) {
       outputLabel.setText("Authentication successful!");
-      try {
-        user = userBal.getUser(password, cryptoService.hash(password));
-      } catch (UnsupportedEncodingException e) {
-        logger.error("Error occurred while hashing password", e);
-      }
+      user = userBal.getUser(password, password);
       mainDashboardUI(layout, user);
     } else {
       outputLabel.setText("Incorrect Password");
