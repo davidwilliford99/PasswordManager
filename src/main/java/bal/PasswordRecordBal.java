@@ -2,6 +2,10 @@ package bal;
 
 import models.PasswordRecord;
 import dal.IPasswordRecordDao;
+import services.ICryptoService;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 
@@ -9,16 +13,21 @@ import java.util.List;
  * Manages business logic for password record operations.
  */
 public class PasswordRecordBal {
+  private static final Logger logger = LogManager.getLogger(PasswordRecordBal.class);
+
 
   private final IPasswordRecordDao passwordRecordDao;
+  private final ICryptoService cryptoService;
 
   /**
-   * Constructs a PasswordRecordBal instance with the provided DAO.
+   * Constructs a PasswordRecordBal instance with the provided DAO and crypto service.
    *
    * @param passwordRecordDao The DAO for password record operations.
+   * @param cryptoService     The service for cryptographic operations.
    */
-  public PasswordRecordBal(IPasswordRecordDao passwordRecordDao) {
+  public PasswordRecordBal(IPasswordRecordDao passwordRecordDao, ICryptoService cryptoService) {
     this.passwordRecordDao = passwordRecordDao;
+    this.cryptoService = cryptoService;
   }
 
   /**
@@ -26,13 +35,18 @@ public class PasswordRecordBal {
    *
    * @param userId   The ID of the user.
    * @param resource The resource (e.g., website or service).
-   * @param password The password for the resource.
+   * @param password The plaintext password for the resource.
    * @param userKey  The encryption key for the database.
-   * @return The created PasswordRecord.
+   * @return The created PasswordRecord, or null if an error occurs.
    */
-  public PasswordRecord addPasswordRecord(int userId, String resource, String password,
-      String userKey) {
-    return passwordRecordDao.addNewPasswordRecord(userId, resource, password, userKey);
+  public PasswordRecord addPasswordRecord(int userId, String resource, String password, String userKey) {
+    try {
+      String hashedPassword = cryptoService.encrypt(password, userKey);
+      return passwordRecordDao.addNewPasswordRecord(userId, resource, hashedPassword, userKey);
+    } catch (Exception e) {
+      logger.error("Error hashing password for resource: {}", resource, e);
+      return null;
+    }
   }
 
   /**

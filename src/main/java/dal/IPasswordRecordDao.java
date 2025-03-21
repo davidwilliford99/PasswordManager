@@ -14,11 +14,11 @@ public interface IPasswordRecordDao {
    *
    * @param userId   The ID of the user.
    * @param resource The resource (e.g., website or service).
-   * @param password The password for the resource.
+   * @param hashedPassword The password for the resource.
    * @param userKey  The encryption key.
    * @return The created PasswordRecord.
    */
-  PasswordRecord addNewPasswordRecord(int userId, String resource, String password, String userKey);
+  PasswordRecord addNewPasswordRecord(int userId, String resource, String hashedPassword, String userKey);
 
   /**
    * Retrieves a password record by its resource.

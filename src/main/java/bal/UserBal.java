@@ -31,28 +31,17 @@ public class UserBal {
   }
 
   /**
-   * Retrieves a user by their password and encryption key.
+   * Retrieves a user by their plaintext password and encryption key.
+   * The password is hashed before being passed to the DAL.
    *
-   * @param password The user's password.
-   * @param userKey  The encryption key.
-   * @return The User object, or null if not found.
+   * @param password The user's plaintext password.
+   * @param userKey       The encryption key.
+   * @return The User object, or null if not found or an error occurs.
    */
   public User getUser(String password, String userKey) {
-    return userDao.getUser(password, userKey);
-  }
-
-  /**
-   * Creates a new user with the given password.
-   *
-   * @param password The user's password.
-   * @return The newly created User, or null if an error occurs.
-   */
-  public User createUser(String password) {
     try {
-      String encryptionKey = cryptoService.hash(password);
-      User user = new User(password);
-      user.setEncryptionKey(encryptionKey);
-      return userDao.addNewUser(password, encryptionKey);
+      String hashedPassword = cryptoService.hash(password);
+      return userDao.getUser(hashedPassword, userKey);
     } catch (UnsupportedEncodingException e) {
       logger.error("Error hashing password", e);
       return null;
@@ -60,17 +49,34 @@ public class UserBal {
   }
 
   /**
-   * Authenticates a user by checking if the provided password matches a user in the database.
+   * Creates a new user with the given plaintext password.
+   * The password is hashed before being passed to the DAL.
    *
-   * @param password The password to authenticate.
+   * @param password The user's plaintext password.
+   * @return The newly created User, or null if an error occurs.
+   */
+  public User createUser(String password) {
+    try {
+      String hashedPassword = cryptoService.hash(password);
+      return userDao.addNewUser(hashedPassword, hashedPassword);
+    } catch (UnsupportedEncodingException e) {
+      logger.error("Error hashing password", e);
+      return null;
+    }
+  }
+
+  /**
+   * Authenticates a user by checking if the provided plaintext password matches a user in the database.
+   * The password is hashed before being passed to the DAL.
+   *
+   * @param password The plaintext password to authenticate.
    * @return True if authentication succeeds, false otherwise.
    */
   public boolean authenticateUser(String password) {
     try {
-      String encryptionKey = cryptoService.hash(password);
-      User user = userDao.getUser(password, encryptionKey);
-      return user != null
-          && user.getId() != 50000; // 50000 is the default ID for non-database users
+      String hashedPassword = cryptoService.hash(password);
+      User user = userDao.getUser(hashedPassword, hashedPassword);
+      return user != null && user.getId() != 50000; // 50000 is the default ID for non-database users
     } catch (UnsupportedEncodingException e) {
       logger.error("Error hashing the user's password", e);
       return false;
