@@ -10,14 +10,17 @@ import java.util.stream.Stream;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+/**
+ * Manages the application data directory and related file operations.
+ */
 public class AppDataDirectory {
+
     private static final Logger logger = LogManager.getLogger(AppDataDirectory.class);
 
     public static final String APP_NAME = "PasswordManager";
     public static final String APP_DATA_PATH = getAppDataPath().toString();
-    public static final String DB_PATH = Paths.get(APP_DATA_PATH,"database.db").toString();
+    public static final String DB_PATH = Paths.get(APP_DATA_PATH, "database.db").toString();
     public static final String DB_URL = "jdbc:sqlite:" + DB_PATH;
-
 
     /**
      * Returns the platform-specific application data directory path.
@@ -53,7 +56,7 @@ public class AppDataDirectory {
     /**
      * Checks if the application data directory exists.
      *
-     * @return true if the directory exists, false otherwise.
+     * @return True if the directory exists, false otherwise.
      */
     public static boolean doesAppDataDirectoryExist() {
         Path path = getAppDataPath();
@@ -62,9 +65,9 @@ public class AppDataDirectory {
     }
 
     /**
-     * Checks if there is an existing .db file in app data directory
+     * Checks if a database file (.db) exists in the application data directory.
      *
-     * @return true if a file with the .db extension exists, false otherwise
+     * @return True if a .db file exists, false otherwise.
      */
     public static boolean doesDbFileExist() {
         if (!doesAppDataDirectoryExist()) {
@@ -81,7 +84,14 @@ public class AppDataDirectory {
             logger.error("An error occurred while looking for existing database", e);
             return false;
         }
-
     }
 
+    /**
+     * Checks if this is the application's first start.
+     *
+     * @return True if either the app directory or .db file doesn't exist, false otherwise.
+     */
+    public static boolean isFirstStart() {
+        return !doesAppDataDirectoryExist() || !doesDbFileExist();
+    }
 }
